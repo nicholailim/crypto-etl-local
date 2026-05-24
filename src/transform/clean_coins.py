@@ -1,4 +1,5 @@
 import pandas as pd
+from src.logger import logger
 
 
 def clean_coins(raw_data):
@@ -18,7 +19,7 @@ def clean_coins(raw_data):
     # A DataFrame is like a table — rows and columns, similar to Excel.
     df = pd.DataFrame(raw_data)
 
-    print(f"Raw data shape: {df.shape[0]} rows, {df.shape[1]} columns")
+    logger.debug(f"Raw data shape: {df.shape[0]} rows, {df.shape[1]} columns")
 
     # Step 2: Select only the columns we actually need.
     # Everything else gets dropped here.
@@ -51,10 +52,19 @@ def clean_coins(raw_data):
 
     # Step 5: Drop rows where critical fields are missing (NaN).
     # We don't want to insert incomplete records into the database.
+    rows_before = len(df)
     df = df.dropna(subset=["coin_id", "current_price", "market_cap"])
+    rows_dropped = rows_before - len(df)
+    if rows_dropped > 0:
+        logger.warning(f"{rows_dropped} row(s) dropped due to null critical fields.")
 
-    print(f"Clean data shape: {df.shape[0]} rows, {df.shape[1]} columns")
-    print(f"Columns: {list(df.columns)}")
+    # Step 6: Warn if any prices are zero or negative — that's likely bad data.
+    invalid_prices = df[df["current_price"] <= 0]
+    if not invalid_prices.empty:
+        logger.warning(f"{len(invalid_prices)} row(s) have zero or negative price: {list(invalid_prices['coin_id'])}")
+
+    logger.info(f"Clean data shape: {df.shape[0]} rows, {df.shape[1]} columns")
+    logger.debug(f"Columns: {list(df.columns)}")
 
     return df
 

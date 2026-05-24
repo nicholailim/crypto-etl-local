@@ -2,6 +2,7 @@ import requests
 import json
 import os
 from datetime import datetime
+from src.logger import logger
 
 # The CoinGecko API endpoint we're calling.
 # This endpoint returns market data for a list of coins.
@@ -28,20 +29,31 @@ def fetch_coins():
     Also saves the raw response to data/raw/ as a JSON file for backup.
     """
 
-    print("Fetching data from CoinGecko API...")
+    logger.info("Fetching data from CoinGecko API...")
 
-    # Make the HTTP GET request to the API
-    response = requests.get(API_URL, params=PARAMS)
+    try:
+        # Make the HTTP GET request to the API
+        response = requests.get(API_URL, params=PARAMS, timeout=10)
 
-    # Check if the request succeeded (status 200 = OK)
-    # If something went wrong (e.g. 429 rate limit, 500 server error),
-    # raise_for_status() will raise an exception so we know immediately
-    response.raise_for_status()
+        # Check if the request succeeded (status 200 = OK)
+        # If something went wrong (e.g. 429 rate limit, 500 server error),
+        # raise_for_status() will raise an exception so we know immediately
+        response.raise_for_status()
 
-    # Parse the JSON response body into a Python list of dicts
-    data = response.json()
+        # Parse the JSON response body into a Python list of dicts
+        data = response.json()
+    except requests.exceptions.Timeout as exc:
+        raise RuntimeError("CoinGecko API request timed out.") from exc
+    except requests.exceptions.ConnectionError as exc:
+        raise RuntimeError("Could not connect to CoinGecko API.") from exc
+    except requests.exceptions.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else "unknown"
+        raise RuntimeError(f"CoinGecko API returned HTTP error: {status_code}.") from exc
+    except requests.exceptions.RequestException as exc:
+        raise RuntimeError("CoinGecko API request failed.") from exc
 
-    print(f"Fetched {len(data)} coins successfully.")
+
+    logger.info(f"Fetched {len(data)} coins successfully.")
 
     # Save raw response to data/raw/ with a timestamp in the filename
     # This gives us a backup in case the Transform step has a bug
@@ -68,7 +80,7 @@ def save_raw(data):
     with open(filepath, "w") as f:
         json.dump(data, f, indent=2)
 
-    print(f"Raw data saved to: {filepath}")
+    logger.debug(f"Raw data saved to: {filepath}")
 
 
 # This block only runs if you execute this file directly

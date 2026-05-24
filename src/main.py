@@ -2,28 +2,50 @@
 # This is where the Extract → Transform → Load steps will be orchestrated.
 # We'll build each step one at a time.
 
-from extract.fetch_coins import fetch_coins
-from transform.clean_coins import clean_coins
-from load.insert_coins import insert_coins
+from src.extract.fetch_coins import fetch_coins
+from src.transform.clean_coins import clean_coins
+from src.load.insert_coins import insert_coins
+from src.logger import logger
 
 
 def run_pipeline():
-    print("=" * 40)
-    print("ETL Pipeline starting...")
-    print("=" * 40)
+    logger.info("=" * 40)
+    logger.info("ETL Pipeline starting...")
+    logger.info("=" * 40)
 
     # Step 1: Extract — call the API, save raw JSON
-    raw_data = fetch_coins()
+    logger.info("[EXTRACT] Starting...")
+    try:
+        raw_data = fetch_coins()
+        logger.info("[EXTRACT] Done.")
+    except Exception as e:
+        logger.error(f"[EXTRACT] FAILED — {e}")
+        logger.error("Pipeline stopped.")
+        return
 
     # Step 2: Transform — clean, rename, convert types
-    clean_data = clean_coins(raw_data)
+    logger.info("[TRANSFORM] Starting...")
+    try:
+        clean_data = clean_coins(raw_data)
+        logger.info("[TRANSFORM] Done.")
+    except Exception as e:
+        logger.error(f"[TRANSFORM] FAILED — {e}")
+        logger.error("Pipeline stopped.")
+        return
 
     # Step 3: Load — insert into PostgreSQL
-    insert_coins(clean_data)
+    logger.info("[LOAD] Starting...")
+    try:
+        insert_coins(clean_data)
+        logger.info("[LOAD] Done.")
+    except Exception as e:
+        logger.error(f"[LOAD] FAILED — {e}")
+        logger.error("Pipeline stopped.")
+        return
 
-    print("=" * 40)
-    print("Pipeline complete.")
-    print("=" * 40)
+    logger.info("=" * 40)
+    logger.info("Pipeline complete.")
+    logger.info("=" * 40)
 
 
 if __name__ == "__main__":

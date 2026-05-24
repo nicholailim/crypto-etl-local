@@ -1,6 +1,7 @@
 import psycopg2
 import os
 from dotenv import load_dotenv
+from src.logger import logger
 
 # Load the variables from our .env file into the environment.
 # After this line, os.getenv() can read DB_HOST, DB_PASSWORD, etc.
@@ -35,7 +36,7 @@ def insert_coins(df):
     # A cursor lets us execute SQL commands
     cursor = conn.cursor()
 
-    print(f"Inserting {len(df)} rows into crypto_prices...")
+    logger.info(f"Inserting {len(df)} rows into crypto_prices...")
 
     # Loop through each row in the DataFrame and insert it
     for _, row in df.iterrows():
@@ -67,7 +68,7 @@ def insert_coins(df):
     # Without this, the inserts are temporary and lost when the connection closes.
     conn.commit()
 
-    print(f"Successfully inserted {len(df)} rows.")
+    logger.info(f"Successfully inserted {len(df)} rows.")
 
     # Always close the cursor and connection when done
     cursor.close()
