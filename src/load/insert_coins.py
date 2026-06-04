@@ -38,7 +38,24 @@ def insert_coins(df):
 
     logger.info(f"Inserting {len(df)} rows into crypto_prices...")
 
-    # Loop through each row in the DataFrame and insert it
+    # Ensure a unique constraint exists (coin_id, extracted_at) to prevent exact duplicates in a run
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_indexes
+                WHERE schemaname = 'public' AND indexname = 'uq_coin_extracted_at') THEN
+                BEGIN
+                    -- create a unique index that effectively enforces one row per coin per run timestamp
+                    EXECUTE 'CREATE UNIQUE INDEX uq_coin_extracted_at ON crypto_prices(coin_id, extracted_at)';
+                END;
+            END IF;
+        END$$;
+    """)
+
+    conflicts = 0
+
+    # Loop through each row in the DataFrame and insert it; ignore exact duplicates for same run timestamp
     for _, row in df.iterrows():
         cursor.execute("""
             INSERT INTO crypto_prices (
@@ -52,6 +69,7 @@ def insert_coins(df):
                 price_change_pct_24h,
                 last_updated
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (coin_id, extracted_at) DO NOTHING
         """, (
             row["coin_id"],
             row["symbol"],
@@ -63,12 +81,17 @@ def insert_coins(df):
             row["price_change_pct_24h"],
             row["last_updated"],
         ))
+        # track if nothing was inserted for this row
+        if cursor.rowcount == 0:
+            conflicts += 1
 
     # commit() saves all the inserts to the database permanently.
     # Without this, the inserts are temporary and lost when the connection closes.
     conn.commit()
 
-    logger.info(f"Successfully inserted {len(df)} rows.")
+    if conflicts:
+        logger.warning(f"{conflicts} row(s) skipped due to duplicate (coin_id, extracted_at).")
+    logger.info(f"Successfully inserted {len(df) - conflicts} rows.")
 
     # Always close the cursor and connection when done
     cursor.close()

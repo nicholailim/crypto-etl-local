@@ -3,6 +3,8 @@ import json
 import os
 from datetime import datetime
 from src.logger import logger
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # The CoinGecko API endpoint we're calling.
 # This endpoint returns market data for a list of coins.
@@ -31,9 +33,21 @@ def fetch_coins():
 
     logger.info("Fetching data from CoinGecko API...")
 
+    # Prepare a session with retries for transient errors
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=1.5,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+
     try:
         # Make the HTTP GET request to the API
-        response = requests.get(API_URL, params=PARAMS, timeout=10)
+        response = session.get(API_URL, params=PARAMS, timeout=10)
 
         # Check if the request succeeded (status 200 = OK)
         # If something went wrong (e.g. 429 rate limit, 500 server error),
